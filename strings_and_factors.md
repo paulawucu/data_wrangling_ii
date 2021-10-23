@@ -99,3 +99,66 @@ str_detect(string_vec, "\\[")  # \\ before special character
 ```
 
     ## [1]  TRUE FALSE  TRUE  TRUE
+
+## Why factors are weird
+
+``` r
+factor_vec = factor(c("male", "male", "female", "female"))  # have two levels, put it in alphabetical order
+
+as.numeric(factor_vec)  # male = 2, female = 1
+```
+
+    ## [1] 2 2 1 1
+
+``` r
+factor_vec = fct_relevel(factor_vec, "male")  # just specify one, R will take it to the front
+
+as.numeric(factor_vec)  # male = 1, female = 2
+```
+
+    ## [1] 1 1 2 2
+
+## NSDUH
+
+``` r
+nsduh_url = "http://samhda.s3-us-gov-west-1.amazonaws.com/s3fs-public/field-uploads/2k15StateFiles/NSDUHsaeShortTermCHG2015.htm"
+
+table_marj = 
+  read_html(nsduh_url) %>% 
+  html_table() %>% 
+  first() %>%
+  slice(-1) #%>% 
+  #view  # some untidiness here
+```
+
+Let’s clean this up!
+
+``` r
+marj_df = 
+  table_marj %>% 
+  select(-contains("P value")) %>%  # get rid of all columns with "P value"
+  pivot_longer(-State, names_to = "age_year", values_to = "percent") %>% 
+  separate(age_year, into = c("age", "year"), -11) %>% # form the 11th place to the last, OR use "\\("
+  mutate(
+    year = str_replace(year, "\\(", ""),
+    year = str_replace(year, "\\)", ""),
+    percent = str_replace(percent, "[a-c]$", ""),  # letter at the end of the line
+    percent = as.numeric(percent)
+  ) %>% 
+  filter(!(State %in% c("Total U.S.", "Northeast", "Midwest", "South", "West")))
+```
+
+Do data frame stuff
+
+``` r
+marj_df %>% 
+  filter(age == "12-17") %>% 
+  mutate(
+    State = fct_reorder(State, percent)  # put factor variables in a new order
+  ) %>% 
+  ggplot(aes(x = State, y = percent, color = year)) +
+  geom_point() +
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust= 1))
+```
+
+![](strings_and_factors_files/figure-gfm/unnamed-chunk-11-1.png)<!-- -->
